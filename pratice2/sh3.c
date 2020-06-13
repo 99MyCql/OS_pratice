@@ -14,17 +14,8 @@ static int MAX_ARGS = 100;  // 命令最大参数
 static int MAX_LINE = 512;  // 命令最大长度
 
 
-/**
- * 从 buf 字符串中，根据空格解析出各个参数。
- * params：
- *  - buf: 待解析的字符串
- *  - len: buf 字符串长度
- *  - argv: 从 buf 中解析出的所有参数，类型为字符串数组
- *  - max_argc: 允许的最大参数个数
- * return：
- *  - 参数个数
- */
-int parseline(char *buf, int len, char **argv, int max_argc) {
+// 从 buf 字符串中，根据空格解析出各个参数，并返回参数个数
+int parseline(char *buf, int len, char **argv) {
     int i;
     int pre = 0;
     int next = 0;
@@ -49,7 +40,7 @@ int parseline(char *buf, int len, char **argv, int max_argc) {
         }
         argv[argc][i] = '\0';       // 参数末尾加 \0
         argc++;                     // 参数个数++
-        assert(argc <= max_argc);   // 不能超过最大参数个数
+        assert(argc <= MAX_ARGS);   // 不能超过最大参数个数
 
         // 寻找下一个参数
         pre = next;
@@ -59,7 +50,7 @@ int parseline(char *buf, int len, char **argv, int max_argc) {
 }
 
 
-// print argv
+// 打印 argv 数组
 void print_argv(char **argv, int argc) {
     printf("argc: %d\n", argc);
     int i;
@@ -128,18 +119,26 @@ int check_pipe(char **argv, int argc, int *first_argc, int *next_argc) {
 }
 
 
-// 运行子程序
-void run_subproc(char **argv, int argc, int input_fd, int output_fd) {
+// 运行子程序，返回子进程进程号
+int run_subproc(char **argv, int argc, int input_fd, int output_fd) {
     // 处理特殊程序
     if (strcmp(argv[0], "exit") == 0) {
         exit(0);
     }
     else if (strcmp(argv[0], "cd") == 0) {
-        if (chdir(argv[1]) == -1) {
+        if (chdir(argv[1]) == -1)
             perror("cd");
-        }
-        return;
+        return -1;
     }
+
+    // 拷贝参数数组
+    char **argv_temp = (char**)malloc((argc+1) * sizeof(char*));
+    int i = 0;
+    for (i = 0; i < argc; i++) {
+        argv_temp[i] = (char*)malloc(strlen(argv[i]) * sizeof(char));
+        strcpy(argv_temp[i], argv[i]);
+    }
+    argv_temp[i] = NULL;   // 参数数组后一个为 NULL
 
     pid_t pid;
     // fork 创建子进程
@@ -149,61 +148,53 @@ void run_subproc(char **argv, int argc, int input_fd, int output_fd) {
         	dup2(input_fd, 0);
         	close(input_fd);
 		}
-
         // 重定位标准输出
 		if (output_fd != 1) {
         	dup2(output_fd, 1);
         	close(output_fd);
 		}
-
         // exec 加载程序
-        if (execvp(argv[0], argv) == -1) {
+        if (execvp(argv_temp[0], argv_temp) == -1) {
             perror("command error");
-            return ;
+            return -1;
         }
-    } else {
-        waitpid(pid, NULL, 0);
     }
+
+    // 释放空间
+    for (i = 0; i < argc; i++)
+        free(argv_temp[i]);
+    free(argv_temp);
+
+    return pid;
 }
 
 
 // 运行参数数组化的命令（可能是多个程序命令的结合体：cat /etc/passwd | wc -l）
 // 对于存在管道的命令，先运行第一个程序，再递归处理之后的参数
-void run_command(char **argv, int argc, int input_fd_pipe) {
-    int i = 0;
-
-    // 打印参数
-    if (g_debug) print_argv(argv, argc);
+void run_command(char **argv, int argc, int pre_input_fd) {
+    if (g_debug) print_argv(argv, argc);    // 打印参数
 
     // 检查是否存在管道
-    int first_argc = argc;
-    int next_argc = 0;
+    int first_argc = argc;  // 第一个程序的参数个数
+    int next_argc = 0;      // 之后命令的参数个数
     int has_pipe = check_pipe(argv, argc, &first_argc, &next_argc);
 
     // 检查第一个程序命令中，是否存在重定向
-    int input_fd = input_fd_pipe;   // 如果存在重定向，将会覆盖管道输入
+    int input_fd = pre_input_fd;   // 如果存在重定向，将会覆盖管道输入
     int output_fd = 1;
     first_argc = check_redir(argv, first_argc, &input_fd, &output_fd);
 
-    // 拷贝第一个程序命令的参数数组
-    char **first_argv = (char**)malloc((first_argc+1) * sizeof(char*));
-    for (i = 0; i < first_argc; i++) {
-        first_argv[i] = (char*)malloc(strlen(argv[i]) * sizeof(char));
-        strcpy(first_argv[i], argv[i]);
-    }
-    first_argv[i] = NULL;   // 参数数组后一个为 NULL
+    if (g_debug) print_argv(argv, first_argc);  // 打印参数
 
-    // 打印参数
-    if (g_debug) print_argv(argv, first_argc);
-
-    // 如果存在管道
+    // 如果存在管道符 |
+    pid_t pid;
     if (has_pipe) {
         int fd[2];
         pipe(fd);               // 创建管道
-        assert(output_fd == 1); // 不能既存在重定向说输出，又存在管道输出
+        assert(output_fd == 1); // 不能既存在重定向输出，又存在管道输出
 
         // 先运行第一个程序命令
-        run_subproc(first_argv, first_argc, input_fd, fd[1]);
+        pid = run_subproc(argv, first_argc, input_fd, fd[1]);
         close(fd[1]);   // 很重要！！！关闭写端，读端才能知道写入数据已经结束了！！！
 
         // 再递归运行之后的命令
@@ -211,19 +202,14 @@ void run_command(char **argv, int argc, int input_fd_pipe) {
         close(fd[0]);
     }
     // 如果不存在管道，则直接运行第一个程序命令
-    else {
-        run_subproc(first_argv, first_argc, input_fd, output_fd);
-    }
+    else
+        pid = run_subproc(argv, first_argc, input_fd, output_fd);
+
+    waitpid(pid, NULL, 0);
 
     // 关闭打开的文件描述符
     if (input_fd != 0) close(input_fd);
     if (output_fd != 1) close(output_fd);
-
-    // 释放空间
-    for (i = 0; i < first_argc; i++)
-        if (first_argv[i] != NULL)
-            free(first_argv[i]);
-    free(first_argv);
 }
 
 
@@ -237,7 +223,7 @@ void mysys(char *command) {
 
     // 调用 parseline() 函数解析参数
     char **argv = (char**)malloc((MAX_ARGS+1) * sizeof(char*));
-    int argc = parseline(buf, strlen(buf), argv, MAX_ARGS); // argc 参数个数
+    int argc = parseline(buf, strlen(buf), argv); // argc 参数个数
 
     // 运行命令
     run_command(argv, argc, 0);
