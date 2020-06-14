@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
         write_ret = write(des_fd, buf, 256);
         assert(write_ret != -1);
         memset(buf, 0, sizeof(char)*256);
-    }    
+    }
 
     return 0;
 }

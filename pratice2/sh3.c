@@ -144,15 +144,15 @@ int run_subproc(char **argv, int argc, int input_fd, int output_fd) {
     // fork 创建子进程
     if ((pid = fork()) == 0) {
         // 重定位标准输入
-		if (input_fd != 0) {
-        	dup2(input_fd, 0);
-        	close(input_fd);
-		}
+        if (input_fd != 0) {
+            dup2(input_fd, 0);
+            close(input_fd);
+        }
         // 重定位标准输出
-		if (output_fd != 1) {
-        	dup2(output_fd, 1);
-        	close(output_fd);
-		}
+        if (output_fd != 1) {
+            dup2(output_fd, 1);
+            close(output_fd);
+        }
         // exec 加载程序
         if (execvp(argv_temp[0], argv_temp) == -1) {
             perror("command error");

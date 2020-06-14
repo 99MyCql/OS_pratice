@@ -31,7 +31,7 @@ int parseline(char *buf, char **argv) {
 
         // next == pre 则说明到达 buf 末尾，退出循环
         if (next == pre) break;
-        
+
         // 将参数拷贝到 argv 中
         assert(argc < MAX_ARGS);
         argv[argc] = (char*)malloc((next-pre) * sizeof(char));
@@ -54,7 +54,7 @@ void mysys(char *command) {
     // 拷贝命令行字符串到 buf 缓冲区中
     char *buf = (char*)malloc(strlen(command) * sizeof(char));
     strcpy(buf, command);
- 
+
     // 调用 parseline() 函数解析参数
     char **argv = (char**)malloc(MAX_ARGS * sizeof(char*));
     int argc = parseline(buf, argv);

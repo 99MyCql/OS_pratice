@@ -43,11 +43,11 @@ int main()
     pthread_t worker_tid;
     pthread_create(&worker_tid, NULL, worker, NULL);
 
-    master(); 
-    
+    master();
+
     // 等待线程
     pthread_join(worker_tid, NULL);
-    
+
     // 两个线程结果相加
     double total = master_output + worker_output;
     printf("master_output: %lf, worker_output: %lf, total: %lf, PI/4: %lf\n",

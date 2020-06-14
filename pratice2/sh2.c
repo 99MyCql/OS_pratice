@@ -41,7 +41,7 @@ int parseline(char *buf, int len, char **argv, int max_argc) {
 
         // next == pre 则说明到达 buf 末尾，退出循环
         if (next == pre) break;
-        
+
         // 将参数拷贝到 argv 中
         argv[argc] = (char*)malloc((next-pre+1) * sizeof(char));
         for (i = 0; i < next-pre; i++) {
@@ -105,14 +105,14 @@ void mysys(char *command) {
     char *buf = (char*)malloc(strlen(command) * sizeof(char));
     strcpy(buf, command);
     if (g_debug) printf("%s\n", buf);
- 
+
     // 调用 parseline() 函数解析参数
     char **argv = (char**)malloc((MAX_ARGS+1) * sizeof(char*));
     int argc = parseline(buf, strlen(buf), argv, MAX_ARGS); // argc 参数个数
 
     // 打印参数
     if (g_debug) print_argv(argv, argc);
-    
+
     // 检查是否有重定向
     char *input = NULL;
     char *output = NULL;
@@ -138,14 +138,14 @@ void mysys(char *command) {
     pid_t pid;
     if ((pid = fork()) == 0) {
         int input_fd = 0;   // 标准输入
-		int output_fd = 1;  // 标准输出
+        int output_fd = 1;  // 标准输出
 
         // 重定位标准输出
-		if (output != NULL) {
-        	output_fd = open(output, O_CREAT|O_RDWR, 0666);
-        	dup2(output_fd, 1);
-        	close(output_fd);
-		}
+        if (output != NULL) {
+            output_fd = open(output, O_CREAT|O_RDWR, 0666);
+            dup2(output_fd, 1);
+            close(output_fd);
+        }
 
         if (execvp(argv[0], argv) == -1) {
             perror("command error");
@@ -173,5 +173,5 @@ int main() {
         line[strlen(line)-1] = '\0';    // fgets 会读取换行，去掉末尾换行
         mysys(line);                    // 调用 mysys() 函数执行命令
     }
-    return 0; 
+    return 0;
 }
