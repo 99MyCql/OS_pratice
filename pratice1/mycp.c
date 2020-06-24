@@ -39,5 +39,9 @@ int main(int argc, char *argv[]) {
         memset(buf, 0, sizeof(char)*256);
     }
 
+    // 关闭文件
+    close(source_fd);
+    close(des_fd);
+
     return 0;
 }

@@ -57,7 +57,7 @@ int main()
     double total = 0.0;
     for (i = 0; i < PTHREAD_NUM; i++) {
         Result *result;
-        pthread_join(worker_tid[i], &result);
+        pthread_join(worker_tid[i], (void**)&result);
         total += result->sum;
         free(result);
     }

@@ -12,11 +12,11 @@ double master_output = 0.0; // 主线程输出
 double worker_output = 0.0; // 子线程输出
 
 
+// 计算前半部分
 void master()
 {
-    // 计算后半部分
     int i = 0;
-    for (i = LEIBNIZL_MAX / 2; i < LEIBNIZL_MAX; i++) {
+    for (i = 0; i < LEIBNIZL_MAX / 2; i++) {
         if (i % 2 == 0) master_output += (double)1 / (2*i + 1);
         else master_output -= (double)1 / (2*i + 1);
         if (DEBUG) printf("master: %d --> %lf\n", i, master_output);
@@ -24,11 +24,11 @@ void master()
 }
 
 
+// 计算后半部分
 void *worker(void *arg)
 {
     int i = 0;
-    // 计算前半部分
-    for (i = 0; i < LEIBNIZL_MAX / 2; i++) {
+    for (i = LEIBNIZL_MAX / 2; i < LEIBNIZL_MAX; i++) {
         if (i % 2 == 0) worker_output += (double)1 / (2*i + 1);
         else worker_output -= (double)1 / (2*i + 1);
         if (DEBUG) printf("worker: %d --> %lf\n", i, worker_output);

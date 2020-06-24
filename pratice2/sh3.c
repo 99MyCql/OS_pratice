@@ -105,12 +105,15 @@ int check_pipe(char **argv, int argc, int *first_argc, int *next_argc) {
         if (argv[i][0] == '|') {
             has_pipe = 1;
             *first_argc = i;
+            // 如果管道符与之后的命令之间存在空格，如：| wc -l
             if (strlen(argv[i]) == 1) {
                 *next_argc = argc - i - 1;
                 assert(*next_argc > 0);
-            } else {
+            }
+            // 如果管道符与之后的命令之间不存在空格，如：|wc -l
+            else {
                 *next_argc = argc - i;
-                strcpy(argv[i], argv[i]+1);
+                strcpy(argv[i], argv[i]+1); // 去掉管道，如：|wc ---> wc
             }
             break;
         }
@@ -119,9 +122,10 @@ int check_pipe(char **argv, int argc, int *first_argc, int *next_argc) {
 }
 
 
-// 运行子程序，返回子进程进程号
+// 运行单个程序的命令，可能存在重定向，返回子进程进程号
+// input_fd 和 output_fd 为管道输入输出，如果没有，则分别为 0 和 1
 int run_subproc(char **argv, int argc, int input_fd, int output_fd) {
-    // 处理特殊程序
+    // 处理特殊命令
     if (strcmp(argv[0], "exit") == 0) {
         exit(0);
     }
@@ -131,10 +135,13 @@ int run_subproc(char **argv, int argc, int input_fd, int output_fd) {
         return -1;
     }
 
+    // 检查重定向，重定向输入输出会覆盖管道的输入输出
+    int new_argc = check_redir(argv, argc, &input_fd, &output_fd);
+
     // 拷贝参数数组
-    char **argv_temp = (char**)malloc((argc+1) * sizeof(char*));
+    char **argv_temp = (char**)malloc((new_argc+1) * sizeof(char*));
     int i = 0;
-    for (i = 0; i < argc; i++) {
+    for (i = 0; i < new_argc; i++) {
         argv_temp[i] = (char*)malloc(strlen(argv[i]) * sizeof(char));
         strcpy(argv_temp[i], argv[i]);
     }
@@ -160,6 +167,10 @@ int run_subproc(char **argv, int argc, int input_fd, int output_fd) {
         }
     }
 
+    // 关闭打开的文件描述符
+    if (input_fd != 0) close(input_fd);
+    if (output_fd != 1) close(output_fd);
+
     // 释放空间
     for (i = 0; i < argc; i++)
         free(argv_temp[i]);
@@ -169,9 +180,9 @@ int run_subproc(char **argv, int argc, int input_fd, int output_fd) {
 }
 
 
-// 运行参数数组化的命令（可能是多个程序命令的结合体：cat /etc/passwd | wc -l）
+// 运行参数数组化的完整命令，可能存在管道：cat /etc/passwd | wc -l
 // 对于存在管道的命令，先运行第一个程序，再递归处理之后的参数
-void run_command(char **argv, int argc, int pre_input_fd) {
+void run_command(char **argv, int argc, int pipe_read_fd) {
     if (g_debug) print_argv(argv, argc);    // 打印参数
 
     // 检查是否存在管道
@@ -179,22 +190,17 @@ void run_command(char **argv, int argc, int pre_input_fd) {
     int next_argc = 0;      // 之后命令的参数个数
     int has_pipe = check_pipe(argv, argc, &first_argc, &next_argc);
 
-    // 检查第一个程序命令中，是否存在重定向
-    int input_fd = pre_input_fd;   // 如果存在重定向，将会覆盖管道输入
-    int output_fd = 1;
-    first_argc = check_redir(argv, first_argc, &input_fd, &output_fd);
-
     if (g_debug) print_argv(argv, first_argc);  // 打印参数
 
     // 如果存在管道符 |
     pid_t pid;
     if (has_pipe) {
+        // 创建管道
         int fd[2];
-        pipe(fd);               // 创建管道
-        assert(output_fd == 1); // 不能既存在重定向输出，又存在管道输出
+        pipe(fd);
 
         // 先运行第一个程序命令
-        pid = run_subproc(argv, first_argc, input_fd, fd[1]);
+        pid = run_subproc(argv, first_argc, pipe_read_fd, fd[1]);
         close(fd[1]);   // 很重要！！！关闭写端，读端才能知道写入数据已经结束了！！！
 
         // 再递归运行之后的命令
@@ -203,13 +209,9 @@ void run_command(char **argv, int argc, int pre_input_fd) {
     }
     // 如果不存在管道，则直接运行第一个程序命令
     else
-        pid = run_subproc(argv, first_argc, input_fd, output_fd);
+        pid = run_subproc(argv, first_argc, pipe_read_fd, 1);
 
     waitpid(pid, NULL, 0);
-
-    // 关闭打开的文件描述符
-    if (input_fd != 0) close(input_fd);
-    if (output_fd != 1) close(output_fd);
 }
 
 

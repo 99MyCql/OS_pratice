@@ -25,5 +25,9 @@ int main(int argc, char *argv[]) {
         printf("%s", buf);
         memset(buf, 0, sizeof(char)*256);
     }
+
+    // 关闭文件
+    close(fd);
+
     return 0;
 }

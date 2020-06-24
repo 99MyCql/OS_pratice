@@ -12,13 +12,11 @@ static int MAX_LINE = 1024; // 命令最大长度
 
 
 // 从 buf 字符串中解析出各个参数，空格分隔。返回参数个数
-int parseline(char *buf, char **argv) {
-    int len = strlen(buf);      // 求 buf 长度
-    assert(len <= MAX_LINE);    // 不能大于最大长度
-
-    int argc = 0;   // 参数个数
+int parseline(char *buf, int len, char **argv) {
+    int i;
     int pre = 0;
     int next = 0;
+    int argc = 0;   // 参数个数
     while (1) {
         // 找到第一个非空格的字符，即当前参数的第一个字符
         while (pre < len && buf[pre] == ' ')
@@ -33,15 +31,15 @@ int parseline(char *buf, char **argv) {
         if (next == pre) break;
 
         // 将参数拷贝到 argv 中
-        assert(argc < MAX_ARGS);
-        argv[argc] = (char*)malloc((next-pre) * sizeof(char));
-        int i;
+        argv[argc] = (char*)malloc((next-pre+1) * sizeof(char));
         for (i = 0; i < next-pre; i++) {
             argv[argc][i] = buf[pre+i];
         }
+        argv[argc][i] = '\0';       // 参数末尾加 \0
+        argc++;                     // 参数个数++
+        assert(argc <= MAX_ARGS);   // 不能超过最大参数个数
 
         // 寻找下一个参数
-        argc++;
         pre = next;
     }
 
@@ -50,14 +48,13 @@ int parseline(char *buf, char **argv) {
 
 
 void mysys(char *command) {
-
     // 拷贝命令行字符串到 buf 缓冲区中
     char *buf = (char*)malloc(strlen(command) * sizeof(char));
     strcpy(buf, command);
 
     // 调用 parseline() 函数解析参数
     char **argv = (char**)malloc(MAX_ARGS * sizeof(char*));
-    int argc = parseline(buf, argv);
+    int argc = parseline(buf, strlen(buf), argv);
     assert(argc > 0);
     argv[argc] = NULL;
 

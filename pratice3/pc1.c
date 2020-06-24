@@ -10,13 +10,13 @@
 
 // 缓冲区结构体
 typedef struct {
-    char buffer[BUF_CAPACITY];
-    int count;
-    int in_p;
-    int out_p;
-    pthread_mutex_t mutex;
-    pthread_cond_t empty_buf;
-    pthread_cond_t full_buf;
+    char buffer[BUF_CAPACITY];  // 缓冲区数组
+    int count;                  // 缓冲区大小
+    int in_p;                   // 写指针
+    int out_p;                  // 读指针
+    pthread_mutex_t mutex;      // 互斥量
+    pthread_cond_t empty_buf;   // 缓冲区出现空闲的条件变量
+    pthread_cond_t full_buf;    // 缓冲区出现数据的条件变量
 } Buffer;
 
 int buffer_is_empty(Buffer *buf) {
